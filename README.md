@@ -2,18 +2,14 @@
 
 <img src="assets/banner.png" alt="Ouroboros — an open, token-level detector of AI-written text" width="100%">
 
-# 🐍 Ouroboros
-
-**See *where* a text stops being human.** One forward pass labels every token as <kbd>human</kbd>, <kbd>AI-assisted</kbd> or <kbd>AI-generated</kbd>, finds the boundaries, and says whether the text was run through a humanizer.
-
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.12+-3776ab.svg)](pyproject.toml)
 [![Backbone](https://img.shields.io/badge/backbone-Qwen3--1.7B-8b5cf6.svg)](https://huggingface.co/Qwen/Qwen3-1.7B-Base)
 [![Model](https://img.shields.io/badge/🤗%20model-Jour%2Fouroboros--detector-ffcc4d.svg)](https://huggingface.co/Jour/ouroboros-detector)
 [![Tests](https://img.shields.io/badge/tests-39%20passing-34d399.svg)](tests)
-[![Built by](https://img.shields.io/badge/built%20end--to--end%20by-Claude%20Opus%205.5-d97757.svg)](#-built-end-to-end-by-claude-opus-55)
+[![Built by](https://img.shields.io/badge/built%20end--to--end%20by-Claude%20Opus%205.5-d97757.svg)](#built-end-to-end-by-claude-opus-55)
 
-[Quick start](#-quick-start) · [Benchmarks](#-benchmarks) · [How it works](#-how-it-works) · [What it looks at](#-what-the-model-actually-looks-at) · [Limitations](#-limitations-and-known-biases) · [Training data](#-training-data) · [Reproduce](#-reproduce)
+[Quick start](#quick-start) · [Benchmarks](#benchmarks) · [How it works](#how-it-works) · [What it looks at](#what-the-model-actually-looks-at) · [Limitations](#limitations-and-known-biases) · [Training data](#training-data) · [Reproduce](#reproduce)
 
 </div>
 
@@ -21,30 +17,26 @@
 
 ---
 
-## 🧭 Why Ouroboros?
+Most AI-text detectors give a single score for a whole document. Real text is often mixed — a human draft polished by a model, an AI answer with a paragraph pasted in by hand — and a document-level score can't say which part is which. It also hides failure modes that are easy to trigger by accident: a line wrap, a paragraph break, a handful of look-alike letters can flip a verdict. We measured that too; see [limitations](#limitations-and-known-biases).
 
-- Most detectors answer one question for a whole document: *AI or not?* Real text is **mixed** — a human draft polished by a model, an AI answer with a human paragraph pasted in.
-- A score on the whole document hides *which* part is which, and people who edit with AI tools are not the same as people who paste a chatbot answer.
-- Detectors also fail in boring ways: line wraps, paragraph breaks and a few look-alike letters can swing a verdict. We measured it, and we show it ([limitations](#-limitations-and-known-biases)).
+Ouroboros keeps the paper's core idea — a tokenwise head on a causal LM, fed the window twice — and ships the rest around it: code, weights, the training pipeline, the benchmark, and a short interpretability study of what the model actually reads.
 
-Ouroboros keeps the paper's idea — a **tokenwise** head on a causal LM, with the window fed twice — and ships everything: code, weights, the training pipeline, the benchmark, and an interpretability study of what the model reads.
-
-## ✨ What you get
+## What's in the box
 
 | | |
 |---|---|
-| 🎯 **Token-level provenance** | `human` / `ai-assisted` / `ai-generated`, character-aligned segments with confidence |
-| 📐 **Document fractions** | weighted AI fraction `f_AI`, plus a `human` / `mixed` / `ai` verdict (a `mixed` counts as an error for FPR *and* FNR) |
-| 🕵️ **Humanizer probe** | 4-way head: `human`, `ai-generated`, `humanized-ai`, `mixed-authorship` |
-| ⚡ **Small** | Qwen3-1.7B + merged LoRA, bf16, 3.4 GB, runs on a 12 GB consumer GPU |
-| 🔬 **Interpretable** | layer-by-layer probes, direct logit attribution, causal ablations — [see below](#-what-the-model-actually-looks-at) |
-| 🧪 **Reproducible** | dataset builder, two-stage trainer, calibrator, evaluator, 39 tests |
+| Token-level provenance | `human` / `ai-assisted` / `ai-generated`, character-aligned segments with confidence |
+| Document fractions | weighted AI fraction `f_AI`, plus a `human` / `mixed` / `ai` verdict (a `mixed` result counts as an error for both FPR and FNR) |
+| Humanizer probe | 4-way head: `human`, `ai-generated`, `humanized-ai`, `mixed-authorship` |
+| Size | Qwen3-1.7B + merged LoRA, bf16, 3.4 GB — runs on a 12 GB consumer GPU |
+| Interpretability | layer-by-layer probes, direct logit attribution, causal ablations — [see below](#what-the-model-actually-looks-at) |
+| Reproducibility | dataset builder, two-stage trainer, calibrator, evaluator, 39 tests |
 
-## 🚀 Quick start
+## Quick start
 
-> ```bash
-> pip install "git+https://github.com/Jourdelune/ouroboros-detector.git"
-> ```
+```bash
+pip install "git+https://github.com/Jourdelune/ouroboros-detector.git"
+```
 
 ```python
 from ouroboros.infer.predict import Predictor
@@ -83,7 +75,7 @@ pytest -q            # 39 passed
 Needs Python ≥ 3.12 and a CUDA GPU for training and fast inference (CPU works for short texts).
 </details>
 
-## 📊 Benchmarks
+## Benchmarks
 
 <div align="center"><img src="assets/benchmarks.png" alt="Benchmarks" width="100%"></div>
 
@@ -101,12 +93,12 @@ Held-out **test split of our own corpus**: 12,000 documents (4,531 human, 6,821 
 | 4-way humanizer head, accuracy | 94.9 % | 95.0 % |
 | … recall on `humanized-ai` | 54.1 % | 56.8 % |
 
-**Read these numbers with care.**
+A few things worth knowing before you read these numbers as "accuracy":
 
-- The test set comes from the *same* corpus families as the training data (same generators and source datasets, different documents). It measures in-distribution quality, not how the model will do on your text.
-- They are **not comparable** to the Pangram report's FPR/FNR, which use a different, proprietary corpus and a much larger backbone.
-- v7 trades a little mixed-document accuracy and FNR for a lower FPR than v6. Which is better depends on what an error costs you.
-- The weakest cases are the humanized class (57 % recall — 42 % of humanized AI is read as plain AI, which is still a detection) and the `ai-assisted` class (F1 0.71).
+- The test set comes from the *same* corpus families as the training data (same generators and source datasets, different documents). This measures in-distribution quality, not how the model does on your text.
+- It is **not comparable** to the Pangram report's FPR/FNR, which use a different, proprietary corpus and a much larger backbone.
+- v7 trades some mixed-document accuracy and FNR for a lower FPR than v6. Which direction is better depends on what an error costs you.
+- The weakest cases are the humanized class (57 % recall — the other 42 % of humanized AI is read as plain AI, which is still a detection, just the wrong label) and the `ai-assisted` class (F1 0.71).
 
 <details>
 <summary><b>Miss rate per generator</b> (22 highest among generators with ≥ 40 test documents)</summary>
@@ -116,7 +108,7 @@ Held-out **test split of our own corpus**: 12,000 documents (4,531 human, 6,821 
 The test set covers 218 generators. Almost all are caught on every document; the outlier is a Mistral-family subset (12 %, n = 41).
 </details>
 
-## 🏗️ How it works
+## How it works
 
 <div align="center"><img src="assets/architecture.png" alt="Architecture" width="100%"></div>
 
@@ -142,24 +134,24 @@ One shared causal backbone with a LoRA adapter, and four single-dense-layer head
 - Human sources whose "human" label is unreliable (machine translation, pasted chatbot answers) are dropped.
 </details>
 
-## 🔬 What the model actually looks at
+## What the model actually looks at
 
-We opened the model. Everything below is measured on held-out test passages (English and French, 400–1,600 documents per analysis), with 95 % intervals (Wilson for proportions, bootstrap over documents otherwise). The analysis scripts (probes, direct logit attribution, ablations, bias audit) are research code written against the internal checkout and are **not** part of this release; only their results are reported here.
+We opened the model up. Everything below is measured on held-out test passages (English and French, 400–1,600 documents per analysis), with 95 % intervals (Wilson for proportions, bootstrap over documents otherwise). The analysis scripts (probes, direct logit attribution, ablations, bias audit) are research code written against the internal checkout and are **not** part of this release; only their results are reported here.
 
 <div align="center"><img src="assets/interpretability.png" alt="Interpretability" width="100%"></div>
 
 - **Most of it is already in the pre-trained model.** A linear probe on the *untrained* Qwen3-1.7B-Base separates human from AI at 95 % [93–97]; fine-tuning raises that to 98.5 % [97–99] and, above all, makes it **language-independent**: a probe trained on French and tested on English scores 99.5 % [97–100] on Ouroboros against 91.5 % [87–95] on the base model.
-- **The verdict is written late.** Direct logit attribution (exact, reconstruction correlation 0.9999) puts nearly all of the AI-minus-human logit in layers 18–27: two attention heads (L24H2, L26H10) and the last MLP carry the largest shares. Removing the eight most important heads cuts the separation by 31 % [30–32] and leaves accuracy at 98.8 %: the signal is **redundant**.
+- **The verdict is written late.** Direct logit attribution (exact, reconstruction correlation 0.9999) puts nearly all of the AI-minus-human logit in layers 18–27: two attention heads (L24H2, L26H10) and the last MLP carry the largest shares. Removing the eight most important heads cuts the separation by 31 % [30–32] and leaves accuracy at 98.8 %, so the signal is **redundant**, not concentrated in a single circuit.
 - **Sentence boundaries do disproportionate work.** The final period of a sentence is 2.4 % of the tokens and carries 28 % [25–31] of the evidence; paragraph breaks are 0.8 % of the tokens and carry 21 % [19–24]. Blocking attention to boundary tokens in layers 18–27 lowers the separation by 15 %; blocking the same number of random words changes it by +1 %.
 - **It reads sentence construction, not vocabulary or decoration.** Shuffling the words inside each sentence lowers the AI logit by 6.7 [6.1–7.3] and flips 41 % of AI texts; surface edits (markdown, connectors, contractions, typos, punctuation) move it by at most 0.6 logit.
 - **It is not a perplexity detector.** The correlation between v7's score and a base language model's surprisal, within AI texts, is 0.09 [−0.05, 0.24].
 - **One sentence is often enough.** 82 % of isolated AI sentences are detected, and 87 % of isolated human sentences are cleared.
 
-## ⚠️ Limitations and known biases
+## Limitations and known biases
 
 <div align="center"><img src="assets/biases.png" alt="Known biases" width="80%"></div>
 
-These come from our own audit of v7 and we would rather you read them here than discover them in production.
+These are our own measurements of v7, not a generic disclaimer — we'd rather you read them here than find them in production.
 
 | | human texts flagged as AI |
 |---|---:|
@@ -178,7 +170,7 @@ These come from our own audit of v7 and we would rather you read them here than 
 - **False positives have victims.** AI-text detectors can wrongly flag non-native writers and formal prose. Keep a human in the loop.
 - Labels for "human" in public datasets are imperfect, and the corpus mixes generators from many years; recent frontier models change quickly.
 
-## 🗂️ Training data
+## Training data
 
 The corpus is built from **public** sources (nothing proprietary): the RAID benchmark; MAGE; COLING-2025 MGT; ai-text-detection-pile; `dmitva/human_ai_generated_text`; Cosmopedia; WildChat and UltraChat; OpenHermes-2.5; LMSYS-style arena preference sets; Amazon, Yelp and IMDB reviews; arXiv abstracts; FineWeb-2 (French) and FineWeb-Edu; the Aya dataset; Wikipedia; French instruction sets; and several public distillation sets from recent frontier models. The full list of 48 recipes, with each dataset's label convention, is in [`src/ouroboros/data/hf_sources.py`](src/ouroboros/data/hf_sources.py).
 
@@ -186,7 +178,7 @@ The final training set holds ≈ 1.09 M documents (including augmentations), wit
 
 > **Licences.** The code is Apache-2.0 and the backbone (Qwen3) is Apache-2.0, but the training data comes from many datasets, each under its own terms (some research-only or non-commercial). **Check the licence of every dataset you use before reusing the data or the weights commercially.** We do not redistribute any dataset.
 
-## 🔁 Reproduce
+## Reproduce
 
 [`scripts/build_dataset.sh`](scripts/build_dataset.sh) lists every stage with the commands and settings used: sample RAID → fetch Hugging Face corpora → generate AI edits of human text → assemble the span-annotated corpus → format augmentation → two-stage training → calibration → evaluation → active-learning mining.
 
@@ -198,17 +190,17 @@ ouroboros calibrate --run-dir runs/stage2 --shards data/corpus/calibration.jsonl
 ouroboros eval --run-dir runs/stage2 --shards data/corpus/test.jsonl
 ```
 
-This reproduces the **structure** of the pipeline. It does not reproduce the released weights bit for bit: the released corpus grew over several rounds, some Hugging Face fetches were run interactively, and part of the recent-model data came from a paid API. The individual stages (format augmentation, dataset fetch, the CLI, the model loading, 39 tests) were each run and checked for this release; the full pipeline was not re-run end to end.
+This reproduces the **structure** of the pipeline, not the released weights bit for bit: the corpus grew over several rounds, some Hugging Face fetches were run interactively, and part of the recent-model data came from a paid API. Each stage (format augmentation, dataset fetch, the CLI, model loading, the 39 tests) was run and checked for this release; the full pipeline was not re-run end to end.
 
-## 🤖 Built end to end by Claude Opus 5.5
+## Built end to end by Claude Opus 5.5
 
-This project — the architecture implementation, the data pipeline, the training runs, the evaluation, the interpretability study, the bias audit, the demo and this README — was designed, written and run end to end by **Claude Opus 5.5** (Anthropic) working as an autonomous coding agent, at the direction of the repository's author, who set the goals, chose the trade-offs and reviewed the results. The numbers above come from result files produced during the project; the model-loading, evaluation and data code in this repository was run and checked for the release, the analysis scripts were not included.
+The architecture implementation, data pipeline, training runs, evaluation, interpretability study, bias audit, demo and this README were written and run by **Claude Opus 5.5** (Anthropic), working as an autonomous coding agent, at the direction of the repository's author, who set the goals, chose the trade-offs and reviewed the results. The numbers above come from result files produced during the project; the model-loading, evaluation and data code in this repository was run and checked for the release. The analysis scripts behind the interpretability section were not included — only their output was.
 
-## 🙏 Acknowledgements
+## Acknowledgements
 
 The method is from the Pangram 4 technical report ([arXiv:2607.27183](https://arxiv.org/abs/2607.27183)); Repeat2 follows [arXiv:2505.01475](https://arxiv.org/abs/2505.01475). Thanks to the maintainers of RAID, MAGE, COLING-2025 MGT, WildChat, Cosmopedia, FineWeb and the other public datasets; to the Qwen team for the backbone; and to the authors of the Hugging Face `transformers`, `peft` and Gradio libraries.
 
-## 📄 License and citation
+## License and citation
 
 Code: [Apache-2.0](LICENSE). Please also respect the licences of the datasets listed above.
 
