@@ -3,7 +3,7 @@
 <img src="assets/banner.png" alt="Ouroboros — an open, token-level detector of AI-written text" width="100%">
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Python](https://img.shields.io/badge/python-3.12+-3776ab.svg)](pyproject.toml)
+[![Python](https://img.shields.io/badge/python-3.10+-3776ab.svg)](pyproject.toml)
 [![Backbone](https://img.shields.io/badge/backbone-Qwen3--1.7B-8b5cf6.svg)](https://huggingface.co/Qwen/Qwen3-1.7B-Base)
 [![Model](https://img.shields.io/badge/🤗%20model-Jour%2Fouroboros--detector-ffcc4d.svg)](https://huggingface.co/Jour/ouroboros-detector)
 [![Tests](https://img.shields.io/badge/tests-39%20passing-34d399.svg)](tests)
@@ -72,7 +72,7 @@ pip install -e ".[demo,train,dev]"
 pytest -q            # 39 passed
 ```
 
-Needs Python ≥ 3.12 and a CUDA GPU for training and fast inference (CPU works for short texts).
+Needs Python ≥ 3.10 and a CUDA GPU for training and fast inference (CPU works for short texts).
 </details>
 
 ## Benchmarks
