@@ -8,6 +8,12 @@ four-way humanization probe.
 The "Why?" section explains the prediction: word attributions from the
 gradient of an AI score with respect to the input embeddings (Gradient x Input
 or Integrated Gradients), and sentence occlusion (re-score without each sentence).
+
+On a Hugging Face ZeroGPU Space, the ``spaces`` package attaches a GPU for the
+duration of ``analyse`` / ``explain`` only; everything else (building the UI,
+holding the model between requests) runs on the Space's CPU. Locally, without
+``spaces`` installed, the decorator below is a no-op and the model just uses
+whatever ``--device`` was passed.
 """
 
 from __future__ import annotations
@@ -23,6 +29,15 @@ import gradio as gr
 import numpy as np
 import pandas as pd
 import torch
+
+try:
+    import spaces
+
+    gpu = spaces.GPU
+except ImportError:  # plain local / non-Spaces run
+
+    def gpu(fn=None, **_kwargs):
+        return fn if fn is not None else (lambda f: f)
 
 from ouroboros.infer.extract import SUPPORTED, extract_text, normalize_layout, unwrap
 from ouroboros.infer.explain import (
@@ -140,6 +155,7 @@ def prepare(text: str, normalize) -> tuple[str, bool]:
     return canonical, canonical != text
 
 
+@gpu(duration=60)
 def analyse(text: str, state: DemoState, normalize=NORM_FULL):
     text, changed = prepare(text, normalize)
     if not text:
@@ -258,6 +274,7 @@ def _top_words(words, k: int = 15) -> tuple[list[list], list[list]]:
     return to_ai, to_human
 
 
+@gpu(duration=90)
 def explain(text: str, method_label: str, target_label: str, steps: int, occlude: bool, state):
     text = (text or "").strip()
     if not text:
