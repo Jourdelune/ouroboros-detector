@@ -1,0 +1,24 @@
+extends: base.yaml
+# The recipe of the released model (Ouroboros v7). v7 is the end of a chain of continued stage-2 fine-tunings, each on
+# a larger corpus plus the cases the previous model still got wrong (active learning, report Section 4.2):
+#   base Qwen3-1.7B -> stage 1 -> stage 2 (v1) -> v2 -> v3 -> ... -> v6 -> v7
+# For v7 the backbone is the merged v6 and the heads are warm-started from v6. To retrain from scratch use stage1/stage2.yaml.
+backbone:
+  name: runs/v6_stage2/merged
+train:
+  output_dir: runs/v7_stage2
+  init_from: runs/v6_stage2/checkpoint
+  stage: 2
+  steps: 6000
+  batch_size: 4
+  grad_accum: 4
+  lr: 5.0e-5
+  head_lr: 5.0e-4
+  warmup_ratio: 0.03
+  eval_every: 500
+  save_every: 500
+  log_every: 25
+  w_segment: 1.0
+  w_token: 1.0
+  w_mixed: 0.5
+  w_humanizer: 0.25

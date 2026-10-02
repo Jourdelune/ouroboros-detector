@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+.venv/
+.env
+.env.*
+*.egg-info/
+build/
+dist/
+runs/
+/data/*
+!/data/.gitkeep
+logs/
+.pytest_cache/
+*.safetensors
+*.pt
+*.bin

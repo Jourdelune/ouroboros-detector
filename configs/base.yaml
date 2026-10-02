@@ -1,0 +1,36 @@
+# Shared settings. The report's backbone is "a popular open-weight MoE model";
+# no MoE of that class fits a 12 GB RTX 4070, so we use a small dense causal LM
+# and keep everything else -- heads, Repeat2, two-stage schedule, CRF decoding --
+# faithful to the paper.
+backbone:
+  name: Qwen/Qwen3-1.7B-Base
+  dtype: bfloat16
+  attn_implementation: sdpa
+  gradient_checkpointing: true
+
+lora:
+  r: 32
+  alpha: 64
+  dropout: 0.05
+  # "Attention + dense" was the best iso-compute LoRA targeting in Table 1.
+  target_modules: [q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj]
+  target_routed_experts: false
+
+data:
+  train_shards: [data/corpus/train.jsonl]
+  eval_shards: [data/corpus/eval.jsonl]
+  calibration_shards: [data/corpus/calibration.jsonl]
+  test_shards: [data/corpus/test.jsonl]
+  window_tokens: 512
+  stride_tokens: 256
+  min_words: 50
+  max_windows_per_doc: 2
+  mixed_threshold: 0.15
+  soft_bucket_sharpness: 1.0
+
+postprocess:
+  smoothness_lambda: 4.0
+  mixed_gamma: 0.5
+  min_segment_tokens: 32
+  human_fraction_threshold: 0.90
+  ai_fraction_threshold: 0.80

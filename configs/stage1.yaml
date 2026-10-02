@@ -1,0 +1,17 @@
+extends: base.yaml
+# Stage 1: single-copy 512-token inputs; segment head + stop-gradient humanizer
+# probe only (report Table 2).
+train:
+  output_dir: runs/stage1
+  stage: 1
+  steps: 5000
+  batch_size: 8
+  grad_accum: 2
+  lr: 1.0e-4
+  head_lr: 1.0e-3
+  warmup_ratio: 0.03
+  eval_every: 250
+  save_every: 500
+  log_every: 25
+  w_segment: 1.0
+  w_humanizer: 0.25
